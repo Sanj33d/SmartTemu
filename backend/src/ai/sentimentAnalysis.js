@@ -1,14 +1,22 @@
 const Groq = require('groq-sdk');
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
-});
+let groq = null;
+
+const getGroqClient = () => {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not configured');
+  }
+  if (!groq) {
+    groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY
+    });
+  }
+  return groq;
+};
 
 const analyzeReviewSentiment = async (reviewText) => {
   try {
-    if (!process.env.GROQ_API_KEY) {
-      throw new Error('GROQ_API_KEY is not configured');
-    }
+    const groqClient = getGroqClient();
 
     if (!reviewText || typeof reviewText !== 'string' || reviewText.trim().length === 0) {
       throw new Error('Review text is required');
@@ -32,7 +40,7 @@ Guidelines:
 - sentimentScore should be precise: 0.0-0.3 (negative), 0.4-0.6 (neutral), 0.7-1.0 (positive)
 - Only return valid JSON, no additional text`;
 
-    const completion = await groq.chat.completions.create({
+    const completion = await groqClient.chat.completions.create({
       messages: [{ role: 'user', content: systemPrompt }],
       model: 'llama-3.1-8b-instant',
       temperature: 0.3,
@@ -77,9 +85,7 @@ Guidelines:
 
 const generateSentimentSummary = async (reviews) => {
   try {
-    if (!process.env.GROQ_API_KEY) {
-      throw new Error('GROQ_API_KEY is not configured');
-    }
+    const groqClient = getGroqClient();
 
     if (!reviews || !Array.isArray(reviews) || reviews.length === 0) {
       return 'No reviews available for sentiment analysis.';
@@ -121,7 +127,7 @@ Generate a concise, helpful summary (2-3 sentences) that highlights:
 
 Keep it natural, informative, and useful for potential customers. Do not include statistics numbers in the summary, just describe the sentiment and themes.`;
 
-    const completion = await groq.chat.completions.create({
+    const completion = await groqClient.chat.completions.create({
       messages: [{ role: 'user', content: systemPrompt }],
       model: 'llama-3.1-8b-instant',
       temperature: 0.7,

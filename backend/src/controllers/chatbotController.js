@@ -2,9 +2,19 @@
 const Groq = require('groq-sdk');
 const Product = require('../models/Product');
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
-});
+let groq = null;
+
+const getGroqClient = () => {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not configured');
+  }
+  if (!groq) {
+    groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY
+    });
+  }
+  return groq;
+};
 
 // Cache metadata to avoid hitting DB on every chat message
 let cachedStats = null;
@@ -145,6 +155,7 @@ const getProductContext = async (userQuery) => {
 
 const generateAIResponse = async (userQuery, context) => {
   try {
+    const groqClient = getGroqClient();
     const { products, metadata } = context;
     
     // Format products into clean string for AI
@@ -175,7 +186,7 @@ INSTRUCTIONS:
 6. Keep responses concise but informative.
 7. If you don't have information, say so honestly.`;
 
-    const completion = await groq.chat.completions.create({
+    const completion = await groqClient.chat.completions.create({
       messages: [{ role: 'user', content: systemPrompt }],
       model: 'llama-3.1-8b-instant',
       temperature: 0.7,
