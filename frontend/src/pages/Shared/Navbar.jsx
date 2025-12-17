@@ -21,6 +21,9 @@ const Navbar = () => {
       <li>
         <NavLink to="/">Home</NavLink>
       </li>
+      <li>
+        <NavLink to="/chatbot">AI Assistant</NavLink>
+      </li>
     </>
   );
 
