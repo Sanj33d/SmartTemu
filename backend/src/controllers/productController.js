@@ -1,6 +1,10 @@
 // Product Controller - Search Functionality
 const Product = require('../models/Product');
 
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
 const searchProducts = async (req, res) => {
   try {
     // Extract query parameters
@@ -37,7 +41,8 @@ const searchProducts = async (req, res) => {
     
     // Add text search using regex
     if (q) {
-      const regex = new RegExp(q, 'i'); 
+      const escapedQuery = escapeRegExp(q);
+      const regex = new RegExp(escapedQuery, 'i'); 
       
       query.$or = [
         { name: regex },
@@ -50,7 +55,8 @@ const searchProducts = async (req, res) => {
     
     // Add category filter
     if (category) {
-      query.category = new RegExp(`^${category}$`, "i");
+      const escapedCategory = escapeRegExp(category);
+      query.category = new RegExp(`^${escapedCategory}$`, "i");
     }
     
     // Add price range filters
