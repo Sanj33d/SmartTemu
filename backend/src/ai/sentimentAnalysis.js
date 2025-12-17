@@ -51,7 +51,8 @@ Guidelines:
     const responseText = completion.choices[0]?.message?.content || '{}';
     const result = JSON.parse(responseText);
 
-    if (!result.sentiment || !result.sentimentScore) {
+    // Check for null/undefined explicitly (0 is a valid sentiment score)
+    if (!result.sentiment || typeof result.sentimentScore !== 'number') {
       throw new Error('Invalid response from AI service');
     }
 

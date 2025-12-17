@@ -61,18 +61,43 @@ const getCachedMetadata = async () => {
 const buildDatabaseQuery = (userQuery) => {
   const query = { isActive: true };
   
-  // Extract price constraints (e.g., "under 50", "over $100")
-  const maxPriceMatch = userQuery.match(/(?:under|below|less than|maximum|max)\s*\$?(\d+)/i);
-  const minPriceMatch = userQuery.match(/(?:over|above|more than|minimum|min)\s*\$?(\d+)/i);
+  // Extract price constraints
+  // Handle range queries: "between X and Y", "from X to Y", "X to Y", "X-Y"
+  const betweenMatch = userQuery.match(/(?:between|from)\s*\$?(\d+)\s*(?:and|to|-)\s*\$?(\d+)/i) ||
+                        userQuery.match(/\$?(\d+)\s*(?:to|-)\s*\$?(\d+)/i);
   
-  // Use MongoDB Text Search (faster and ranks by relevance)
-  query.$text = { $search: userQuery };
+  let maxPriceMatch = null;
+  let minPriceMatch = null;
+  
+  if (betweenMatch) {
+    // "between 50 and 100" or "from $50 to $100" → min: 50, max: 100
+    const val1 = parseFloat(betweenMatch[1]);
+    const val2 = parseFloat(betweenMatch[2]);
+    minPriceMatch = [null, Math.min(val1, val2)];
+    maxPriceMatch = [null, Math.max(val1, val2)];
+  } else {
+    // Handle "under X" or "over Y"
+    maxPriceMatch = userQuery.match(/(?:under|below|less than|maximum|max)\s*\$?(\d+)/i);
+    minPriceMatch = userQuery.match(/(?:over|above|more than|minimum|min)\s*\$?(\d+)/i);
+  }
   
   // Apply price filters if found
   if (maxPriceMatch || minPriceMatch) {
     query.price = {};
     if (maxPriceMatch) query.price.$lte = parseFloat(maxPriceMatch[1]);
     if (minPriceMatch) query.price.$gte = parseFloat(minPriceMatch[1]);
+  }
+  
+  // Remove price-related keywords and generic words from search query
+  let searchQuery = userQuery
+    .replace(/\b(between|from|and|to|under|below|less than|maximum|max|over|above|more than|minimum|min|products?|items?|show|find|get|give|me)\b/gi, '')
+    .replace(/\$?\d+/g, '')
+    .replace(/[?!.,;:-]+/g, '') // Remove punctuation
+    .trim();
+  
+  // Only use text search if there are meaningful search terms left
+  if (searchQuery.length > 2) {
+    query.$text = { $search: searchQuery };
   }
   
   return query;
@@ -103,13 +128,22 @@ const getProductContext = async (userQuery) => {
     const dbQuery = buildDatabaseQuery(userQuery);
     const metadata = await getCachedMetadata();
     
-    // Try MongoDB text search first (faster, better relevance)
-    let products = await Product.find(dbQuery, { score: { $meta: "textScore" } })
-      .sort({ score: { $meta: "textScore" } })
+    // Query products with appropriate sorting
+    let query = Product.find(dbQuery);
+    
+    // Only sort by textScore if we have a text search
+    if (dbQuery.$text) {
+      query = query.sort({ score: { $meta: "textScore" } });
+    } else {
+      // For price-only queries, sort by price ascending, then rating
+      query = query.sort({ price: 1, rating: -1 });
+    }
+    
+    let products = await query
       .limit(10)
       .select('name price category brand rating stock description');
     
-    // Fallback to regex search if text search returns no results
+    // Fallback to regex search if no results found
     if (products.length === 0) {
       const fallbackQuery = buildFallbackQuery(userQuery);
       if (fallbackQuery) {

@@ -14,6 +14,9 @@ const mongoose = require('mongoose');
       category: String,
       brand: String,
       tags: [String],
+      stock: { type: Number, default: 0 },
+      rating: { type: Number, default: 0, min: 0, max: 5 },
+      reviewsCount: { type: Number, default: 0 },
       isActive: { type: Boolean, default: true }
     }, { timestamps: true });
 
@@ -31,7 +34,7 @@ const mongoose = require('mongoose');
     // Clear existing for repeatable testing
     await Product.deleteMany({});
 
-    // Insert dummy products
+    // Insert dummy products with stock (ratings will be set by seedReviews.js)
     await Product.insertMany([
       {
         name: 'Wireless Mouse',
@@ -40,6 +43,9 @@ const mongoose = require('mongoose');
         category: 'Electronics',
         brand: 'LogiTech',
         tags: ['mouse', 'wireless', 'peripherals'],
+        stock: 150,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -49,6 +55,9 @@ const mongoose = require('mongoose');
         category: 'Electronics',
         brand: 'Acer',
         tags: ['laptop', 'gaming', 'computer'],
+        stock: 25,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -58,6 +67,9 @@ const mongoose = require('mongoose');
         category: 'Home',
         brand: 'Mugify',
         tags: ['mug', 'kitchen'],
+        stock: 300,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -67,6 +79,9 @@ const mongoose = require('mongoose');
         category: 'Electronics',
         brand: 'SoundMax',
         tags: ['headphones', 'audio', 'wireless'],
+        stock: 45,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -76,6 +91,9 @@ const mongoose = require('mongoose');
         category: 'Accessories',
         brand: 'GuardPro',
         tags: ['case', 'iphone', 'accessories'],
+        stock: 200,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -85,6 +103,9 @@ const mongoose = require('mongoose');
         category: 'Fitness',
         brand: 'FlexFit',
         tags: ['yoga', 'fitness', 'exercise'],
+        stock: 80,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -94,6 +115,9 @@ const mongoose = require('mongoose');
         category: 'Footwear',
         brand: 'Stride',
         tags: ['shoes', 'running', 'sports'],
+        stock: 65,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -103,6 +127,9 @@ const mongoose = require('mongoose');
         category: 'Home',
         brand: 'BrightLite',
         tags: ['lamp', 'lighting', 'office'],
+        stock: 90,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -112,6 +139,9 @@ const mongoose = require('mongoose');
         category: 'Home Appliances',
         brand: 'HeatWave',
         tags: ['kettle', 'kitchen', 'appliance'],
+        stock: 55,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       },
       {
@@ -121,11 +151,43 @@ const mongoose = require('mongoose');
         category: 'Electronics',
         brand: 'SoundBlast',
         tags: ['speaker', 'audio', 'portable'],
+        stock: 70,
+        rating: 0,
+        reviewsCount: 0,
         isActive: true
       }
     ]);
 
-    console.log('Seeded test products.');
+    console.log('✅ Seeded 10 test products successfully!');
+    
+    // Show statistics
+    const stats = await Product.aggregate([
+      { $match: { isActive: true } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' },
+          avgPrice: { $avg: '$price' },
+          totalStock: { $sum: '$stock' }
+        }
+      }
+    ]);
+    
+    const categories = await Product.distinct('category');
+    
+    console.log('\n📊 Database Statistics:');
+    console.log(`Total Products: ${stats[0].total}`);
+    console.log(`Categories: ${categories.join(', ')}`);
+    console.log(`Price Range: $${stats[0].minPrice.toFixed(2)} - $${stats[0].maxPrice.toFixed(2)}`);
+    console.log(`Average Price: $${stats[0].avgPrice.toFixed(2)}`);
+    console.log(`Total Stock: ${stats[0].totalStock} items`);
+    
+    console.log('\n💬 Your chatbot can now answer queries about these products!');
+    console.log('\n📝 Next Step (Recommended):');
+    console.log('   Run "node scripts/seedReviews.js" to add reviews and ratings to the first 3 products');
+    
     await mongoose.connection.close();
     process.exit(0);
   } catch (err) {
