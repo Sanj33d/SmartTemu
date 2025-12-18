@@ -11,8 +11,15 @@ const app = express();
 // middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// mongodb connect > driver
+const productRoutes = require('./routes/productRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+
+app.use('/api/products', productRoutes);
+app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 const uri = `${process.env.MONGODB_URI}`
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -24,40 +31,32 @@ const client = new MongoClient(uri, {
   }
 });
 
-async function run() {
-  try {
-    // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK' });
+  });
 
-    // fetching from db
-    const productsCollection = client.db('test').collection('products')
-
-    app.get('/products', async (req, res) => {
-        const cursor = productsCollection.find()
-        const result = await cursor.toArray()
-        res.send(result)
-    })
-
-
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
-  }
-}
-run().catch(console.dir);
-
-
-
-app.get('/', (req, res) => {
-    res.send('backend of smartTemu')
-})
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+app.use((req, res, next) => {
+    res.status(404).json({
+        success: false,
+        message: 'Route not found'
+    });
 });
+
+const PORT = process.env.PORT || 5000;
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 // module.exports = app;
 

@@ -3,6 +3,8 @@ import RootLayout from "../layouts/RootLayout";
 import Home from "../pages/Home/Home";
 import Register from "../pages/Register/Register";
 import SignIn from "../pages/SignIn/SignIn";
+import ProductReviews from "../pages/ProductReviews/ProductReviews";
+import Chatbot from "../pages/Chatbot/Chatbot";
 
 const router = createBrowserRouter([
   {
@@ -19,6 +21,14 @@ const router = createBrowserRouter([
         {
             path: '/signIn',
             Component: SignIn
+        },
+        {
+            path: '/reviews/:productId',
+            Component: ProductReviews
+        },
+        {
+            path: '/chatbot',
+            Component: Chatbot
         }
     ]
   },
