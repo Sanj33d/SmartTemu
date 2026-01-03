@@ -3,7 +3,7 @@ const cors = require('cors');
 const PORT = process.env.PORT || 5000;
 
 require('dotenv').config();
-// const connectDB = require('./config/database');
+const connectDB = require('./config/database');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
@@ -16,10 +16,12 @@ app.use(express.urlencoded({ extended: true }));
 const productRoutes = require('./routes/productRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
 
 app.use('/api/products', productRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/recommendations', recommendationRoutes);
 
 const uri = `${process.env.MONGODB_URI}`
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -41,8 +43,6 @@ app.use((req, res, next) => {
         message: 'Route not found'
     });
 });
-
-const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
