@@ -64,19 +64,42 @@ const getQueryBasedRecommendations = async (queryText, limit = 10) => {
  * Get recommendations based on user's preferred products
  * Builds a user preference vector from liked/viewed products
  * @param {string[]} productIds - Array of product IDs the user liked/viewed
+ * @param {string} firebaseUid - Optional: Firebase UID to get user's tracked products
  * @param {number} limit - Number of recommendations (default: 10)
  * @returns {Promise<Array>} - Recommended products
  */
-const getUserBasedRecommendations = async (productIds, limit = 10) => {
+const getUserBasedRecommendations = async (productIds = [], firebaseUid = null, limit = 10) => {
   try {
     if (!productIds || productIds.length === 0) {
       // If no user history, return popular/trending products
       return getPopularProducts(limit);
     }
 
+    // Convert productIds to MongoDB ObjectIds (handle both string and ObjectId formats)
+    // Filter out invalid IDs (Qdrant UUIDs won't be valid ObjectIds)
+    const mongoose = require('mongoose');
+    const validObjectIds = productIds
+      .map(id => {
+        try {
+          const idStr = id.toString();
+          // MongoDB ObjectIds are exactly 24 hex characters
+          if (mongoose.Types.ObjectId.isValid(idStr) && idStr.length === 24 && /^[0-9a-fA-F]{24}$/.test(idStr)) {
+            return new mongoose.Types.ObjectId(idStr);
+          }
+          return null;
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(id => id !== null);
+
+    if (validObjectIds.length === 0) {
+      return getPopularProducts(limit);
+    }
+
     // Get products from MongoDB
     const products = await Product.find({
-      _id: { $in: productIds },
+      _id: { $in: validObjectIds },
       isActive: true
     });
 
@@ -111,8 +134,12 @@ const getUserBasedRecommendations = async (productIds, limit = 10) => {
     });
 
     // Filter out already seen products and return
+    // Use mongoId from payload (Qdrant returns UUID as id, but we store mongoId in payload)
     return recommendedProducts
-      .filter(p => !productIds.includes(p.id))
+      .filter(p => {
+        const mongoId = p.mongoId || p.id;
+        return !productIds.includes(mongoId) && !productIds.some(id => id.toString() === mongoId);
+      })
       .slice(0, limit);
   } catch (error) {
     console.error('Error getting user-based recommendations:', error.message);
