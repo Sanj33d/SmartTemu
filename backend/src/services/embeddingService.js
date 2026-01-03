@@ -1,84 +1,78 @@
 // Embedding configuration
-const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'sentence-transformers/all-MiniLM-L6-v2';
+const EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2'; // Local model from Xenova
 
-const HUGGINGFACE_API_URL = `https://api-inference.huggingface.co/pipeline/feature-extraction/${EMBEDDING_MODEL}`;
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY || null; // Optional but recommended (higher rate limits)
+// Cache the pipeline instance to avoid reloading the model
+let embeddingPipeline = null;
+let transformersModule = null;
+let isLoading = false;
+let loadingPromise = null;
 
 /**
- * Generate embedding using Hugging Face Inference API (FREE)
+ * Load the transformers module (ES Module dynamic import)
+ * @returns {Promise<any>} - The transformers module
+ */
+const loadTransformers = async () => {
+  if (!transformersModule) {
+    transformersModule = await import('@xenova/transformers');
+  }
+  return transformersModule;
+};
+
+/**
+ * Initialize the embedding pipeline (lazy loading)
+ * @returns {Promise<any>} - The embedding pipeline
+ */
+const getEmbeddingPipeline = async () => {
+  // If already loaded, return immediately
+  if (embeddingPipeline) {
+    return embeddingPipeline;
+  }
+  
+  // If currently loading, wait for the existing load to complete
+  if (isLoading && loadingPromise) {
+    await loadingPromise;
+    return embeddingPipeline;
+  }
+  
+  // Start loading
+  isLoading = true;
+  console.log('📦 Loading embedding model for the first time...');
+  
+  loadingPromise = (async () => {
+    try {
+      const { pipeline } = await loadTransformers();
+      embeddingPipeline = await pipeline('feature-extraction', EMBEDDING_MODEL);
+      console.log('✅ Embedding model loaded successfully!');
+    } finally {
+      isLoading = false;
+    }
+  })();
+  
+  await loadingPromise;
+  return embeddingPipeline;
+};
+
+/**
+ * Generate embedding using local Transformers.js (FREE & OFFLINE)
  * @param {string} text - Text to generate embedding for
  * @returns {Promise<number[]>} - Array of numbers (embedding vector)
  */
 const generateEmbedding = async (text) => {
   try {
-    const response = await fetch(HUGGINGFACE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(HUGGINGFACE_API_KEY && { 'Authorization': `Bearer ${HUGGINGFACE_API_KEY}` })
-      },
-      body: JSON.stringify({
-        inputs: text.trim(),
-        options: {
-          wait_for_model: true // Wait if model is loading
-        }
-      })
+    // Get the pipeline (loads model on first call, then uses cache)
+    const pipe = await getEmbeddingPipeline();
+    
+    // Generate embedding with mean pooling and normalization
+    const output = await pipe(text.trim(), { 
+      pooling: 'mean',
+      normalize: true 
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const embedding = await response.json();
     
-    // Handle different response formats
-    if (Array.isArray(embedding) && Array.isArray(embedding[0])) {
-      return embedding[0]; // Sometimes returns [[...]]
-    }
-    if (Array.isArray(embedding)) {
-      return embedding;
-    }
-    
-    throw new Error('Unexpected embedding response format');
+    // Convert tensor to array
+    return Array.from(output.data);
   } catch (error) {
     console.error('Error generating embedding:', error.message);
-    
-    // If model is loading, wait a bit and retry once
-    if (error.message.includes('loading') || error.message.includes('503')) {
-      console.log('⏳ Model is loading, waiting 5 seconds and retrying...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      try {
-        const retryResponse = await fetch(HUGGINGFACE_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(HUGGINGFACE_API_KEY && { 'Authorization': `Bearer ${HUGGINGFACE_API_KEY}` })
-          },
-          body: JSON.stringify({
-            inputs: text.trim(),
-            options: {
-              wait_for_model: true
-            }
-          })
-        });
-        
-        if (retryResponse.ok) {
-          const embedding = await retryResponse.json();
-          if (Array.isArray(embedding) && Array.isArray(embedding[0])) {
-            return embedding[0];
-          }
-          if (Array.isArray(embedding)) {
-            return embedding;
-          }
-        }
-      } catch (retryError) {
-        console.error('Retry failed:', retryError.message);
-      }
-    }
-    
-    throw new Error('Failed to generate embedding');
+    throw new Error(`Failed to generate embedding: ${error.message}`);
   }
 };
 
@@ -105,13 +99,7 @@ const generateProductEmbedding = async (product) => {
  * @returns {number} - Number of dimensions
  */
 const getEmbeddingDimensions = () => {
-  // Hugging Face model dimensions
-  if (EMBEDDING_MODEL.includes('all-MiniLM-L6-v2')) return 384;
-  if (EMBEDDING_MODEL.includes('all-mpnet-base-v2')) return 768;
-  if (EMBEDDING_MODEL.includes('e5-small')) return 384;
-  if (EMBEDDING_MODEL.includes('bge-small')) return 384;
-  
-  // Default for most sentence-transformers models
+  // all-MiniLM-L6-v2 produces 384-dimensional embeddings
   return 384;
 };
 
@@ -120,4 +108,3 @@ module.exports = {
   generateProductEmbedding,
   getEmbeddingDimensions
 };
-
