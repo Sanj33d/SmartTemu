@@ -4,7 +4,6 @@ const PORT = process.env.PORT || 5000;
 
 require('dotenv').config();
 const connectDB = require('./config/database');
-const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
 
@@ -17,21 +16,13 @@ const productRoutes = require('./routes/productRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
+const userTrackingRoutes = require('./routes/userTrackingRoutes');
 
 app.use('/api/products', productRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/recommendations', recommendationRoutes);
-
-const uri = `${process.env.MONGODB_URI}`
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
+app.use('/api/user-tracking', userTrackingRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK' });

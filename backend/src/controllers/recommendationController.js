@@ -82,12 +82,14 @@ const getQueryRecommendations = async (req, res) => {
 
 /**
  * Get personalized recommendations for a user
- * GET /api/recommendations/user?productIds=id1,id2,id3
+ * GET /api/recommendations/user?productIds=id1,id2,id3&firebaseUid=xxx
+ * POST /api/recommendations/user (with firebaseUid in body)
  */
 const getUserRecommendations = async (req, res) => {
   try {
     // Get product IDs from query parameter (comma-separated) or request body
     const productIdsParam = req.query.productIds || req.body.productIds;
+    const firebaseUid = req.query.firebaseUid || req.body.firebaseUid;
     const limit = parseInt(req.query.limit) || 10;
 
     let productIds = [];
@@ -98,7 +100,7 @@ const getUserRecommendations = async (req, res) => {
         : productIdsParam.split(',').map(id => id.trim()).filter(Boolean);
     }
 
-    const recommendations = await getUserBasedRecommendations(productIds, limit);
+    const recommendations = await getUserBasedRecommendations(productIds, firebaseUid, limit);
 
     res.status(200).json({
       success: true,
