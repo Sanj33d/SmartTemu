@@ -43,15 +43,50 @@ const initializeCollection = async () => {
  * @param {Object} payload - Product metadata (name, price, category, etc.)
  * @returns {Promise<void>}
  */
+/**
+ * Convert MongoDB ObjectID to UUID format
+ * MongoDB ObjectIDs are 24 hex characters, UUIDs are 32 hex characters with dashes
+ * @param {string} mongoId - MongoDB ObjectID
+ * @returns {string} - UUID format string
+ */
+const mongoIdToUuid = (mongoId) => {
+  const id = mongoId.toString();
+  // Pad to 32 characters if needed
+  const padded = id.padEnd(32, '0');
+  // Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  return `${padded.slice(0, 8)}-${padded.slice(8, 12)}-${padded.slice(12, 16)}-${padded.slice(16, 20)}-${padded.slice(20, 32)}`;
+};
+
+/**
+ * Upsert a product vector into Qdrant
+ * @param {string} productId - MongoDB product ID
+ * @param {number[]} vector - Embedding vector
+ * @param {Object} payload - Product metadata (name, price, category, etc.)
+ * @returns {Promise<void>}
+ */
 const upsertProduct = async (productId, vector, payload) => {
   try {
+    // Ensure vector is a proper array of numbers
+    const vectorArray = Array.isArray(vector) ? vector : Array.from(vector);
+    
+    // Validate vector
+    if (!vectorArray.every(v => typeof v === 'number' && !isNaN(v))) {
+      throw new Error('Vector contains non-numeric values');
+    }
+    
+    // Convert MongoDB ID to UUID format for Qdrant
+    const qdrantId = mongoIdToUuid(productId);
+    
     await qdrantClient.upsert(PRODUCTS_COLLECTION, {
       wait: true,
       points: [
         {
-          id: productId.toString(), // Qdrant uses string IDs
-          vector: vector,
-          payload: payload
+          id: qdrantId, // Use UUID format
+          vector: vectorArray,
+          payload: {
+            ...payload,
+            mongoId: productId.toString() // Keep original MongoDB ID in payload
+          }
         }
       ]
     });
@@ -99,7 +134,7 @@ const searchSimilarProducts = async (queryVector, options = {}) => {
       // Exclude specific product IDs
       if (excludeIds.length > 0) {
         qdrantFilter.must_not.push({
-          has_id: excludeIds.map(id => id.toString())
+          has_id: excludeIds.map(id => mongoIdToUuid(id.toString()))
         });
       }
     }
@@ -113,7 +148,8 @@ const searchSimilarProducts = async (queryVector, options = {}) => {
     });
 
     return searchResult.map(result => ({
-      id: result.id,
+      id: result.id, // Qdrant UUID
+      mongoId: result.payload.mongoId || result.id, // MongoDB ObjectId from payload
       score: result.score, // Similarity score (0-1, higher is more similar)
       ...result.payload // Product metadata
     }));
@@ -130,9 +166,10 @@ const searchSimilarProducts = async (queryVector, options = {}) => {
  */
 const deleteProduct = async (productId) => {
   try {
+    const qdrantId = mongoIdToUuid(productId);
     await qdrantClient.delete(PRODUCTS_COLLECTION, {
       wait: true,
-      points: [productId.toString()]
+      points: [qdrantId]
     });
   } catch (error) {
     console.error(`Error deleting product ${productId}:`, error.message);
@@ -147,8 +184,9 @@ const deleteProduct = async (productId) => {
  */
 const getProductById = async (productId) => {
   try {
+    const qdrantId = mongoIdToUuid(productId);
     const result = await qdrantClient.retrieve(PRODUCTS_COLLECTION, {
-      ids: [productId.toString()],
+      ids: [qdrantId],
       with_payload: true,
       with_vector: false
     });
@@ -156,7 +194,7 @@ const getProductById = async (productId) => {
     if (result.length === 0) return null;
 
     return {
-      id: result[0].id,
+      id: result[0].payload.mongoId, // Return original MongoDB ID
       ...result[0].payload
     };
   } catch (error) {
