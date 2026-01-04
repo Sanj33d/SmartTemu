@@ -5,6 +5,7 @@ import Register from "../pages/Register/Register";
 import SignIn from "../pages/SignIn/SignIn";
 import ProductReviews from "../pages/ProductReviews/ProductReviews";
 import Chatbot from "../pages/Chatbot/Chatbot";
+import ProductComparison from "../pages/ProductComparison/ProductComparison";
 
 const router = createBrowserRouter([
   {
@@ -29,6 +30,10 @@ const router = createBrowserRouter([
         {
             path: '/chatbot',
             Component: Chatbot
+        },
+        {
+            path: '/compare',
+            Component: ProductComparison
         }
     ]
   },
