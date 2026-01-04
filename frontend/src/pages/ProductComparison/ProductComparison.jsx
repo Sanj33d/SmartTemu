@@ -135,7 +135,7 @@ const ProductComparison = () => {
                       Browse
                     </button>
                     {openDropdownIndex === index && (
-                      <ul className="dropdown-content menu bg-base-100 rounded-box z-[1] w-64 p-2 shadow-lg border max-h-60 overflow-y-auto">
+                      <ul className="dropdown-content menu bg-base-100 rounded-box z-1 w-64 p-2 shadow-lg border max-h-60 overflow-y-auto">
                         {availableProducts.slice(0, 20).map((product) => (
                           <li key={product._id}>
                             <button
