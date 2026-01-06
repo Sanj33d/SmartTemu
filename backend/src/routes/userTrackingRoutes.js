@@ -23,3 +23,4 @@ router.get('/:firebaseUid', getUserTracking);
 
 module.exports = router;
 
+
