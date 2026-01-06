@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const PORT = process.env.PORT || 5000;
 
 require('dotenv').config();
@@ -27,6 +28,11 @@ app.use('/api/user-tracking', userTrackingRoutes);
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK' });
   });
+
+// Serve test-recommendations.html file
+app.get('/test-recommendations.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'test-recommendations.html'));
+});
 
 app.use((req, res, next) => {
     res.status(404).json({
