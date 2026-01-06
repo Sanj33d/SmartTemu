@@ -5,7 +5,9 @@ import Products from "../Products/Products";
 import Banner from "../Shared/Banner";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-const RECOMMENDATION_TEST_URL = 'http://localhost:5000/test-recommendations.html';
+// Extract base URL (remove /api) and append test-recommendations.html
+const BACKEND_BASE_URL = API_BASE_URL.replace('/api', '');
+const RECOMMENDATION_TEST_URL = `${BACKEND_BASE_URL}/test-recommendations.html`;
 
 const Home = () => {
     const [products, setProducts] = useState([]);
