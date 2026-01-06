@@ -1,6 +1,8 @@
 //not tested yet
 const Groq = require('groq-sdk');
-const Product = require('../models/Product');
+const Product = require('../models/Product'); // Still used for metadata only
+const { generateEmbedding } = require('../services/embeddingService');
+const { searchSimilarProducts } = require('../services/qdrantService');
 
 let groq = null;
 
@@ -57,105 +59,65 @@ const getCachedMetadata = async () => {
 };
 
 
-// Build MongoDB query using text search and price filters
-const buildDatabaseQuery = (userQuery) => {
-  const query = { isActive: true };
+// Extract price filters from user query (used for both MongoDB and Qdrant flows)
+const parsePriceFilters = (userQuery) => {
+  let minPrice = null;
+  let maxPrice = null;
   
-  // Extract price constraints
   // Handle range queries: "between X and Y", "from X to Y", "X to Y", "X-Y"
   const betweenMatch = userQuery.match(/(?:between|from)\s*\$?(\d+)\s*(?:and|to|-)\s*\$?(\d+)/i) ||
                         userQuery.match(/\$?(\d+)\s*(?:to|-)\s*\$?(\d+)/i);
-  
-  let maxPriceMatch = null;
-  let minPriceMatch = null;
   
   if (betweenMatch) {
     // "between 50 and 100" or "from $50 to $100" → min: 50, max: 100
     const val1 = parseFloat(betweenMatch[1]);
     const val2 = parseFloat(betweenMatch[2]);
-    minPriceMatch = [null, Math.min(val1, val2)];
-    maxPriceMatch = [null, Math.max(val1, val2)];
+    minPrice = Math.min(val1, val2);
+    maxPrice = Math.max(val1, val2);
   } else {
     // Handle "under X" or "over Y"
-    maxPriceMatch = userQuery.match(/(?:under|below|less than|maximum|max)\s*\$?(\d+)/i);
-    minPriceMatch = userQuery.match(/(?:over|above|more than|minimum|min)\s*\$?(\d+)/i);
+    const maxPriceMatch = userQuery.match(/(?:under|below|less than|maximum|max)\s*\$?(\d+)/i);
+    const minPriceMatch = userQuery.match(/(?:over|above|more than|minimum|min)\s*\$?(\d+)/i);
+    
+    if (maxPriceMatch) {
+      maxPrice = parseFloat(maxPriceMatch[1]);
+    }
+    if (minPriceMatch) {
+      minPrice = parseFloat(minPriceMatch[1]);
+    }
   }
   
-  // Apply price filters if found
-  if (maxPriceMatch || minPriceMatch) {
-    query.price = {};
-    if (maxPriceMatch) query.price.$lte = parseFloat(maxPriceMatch[1]);
-    if (minPriceMatch) query.price.$gte = parseFloat(minPriceMatch[1]);
-  }
-  
-  // Remove price-related keywords and generic words from search query
-  let searchQuery = userQuery
-    .replace(/\b(between|from|and|to|under|below|less than|maximum|max|over|above|more than|minimum|min|products?|items?|show|find|get|give|me)\b/gi, '')
-    .replace(/\$?\d+/g, '')
-    .replace(/[?!.,;:-]+/g, '') // Remove punctuation
-    .trim();
-  
-  // Only use text search if there are meaningful search terms left
-  if (searchQuery.length > 2) {
-    query.$text = { $search: searchQuery };
-  }
-  
-  return query;
-};
-
-// Fallback query when text search fails (typos, no matches)
-const buildFallbackQuery = (userQuery) => {
-  const query = { isActive: true };
-  const searchTerms = userQuery.split(/\s+/).filter(term => term.length > 2);
-  
-  if (searchTerms.length === 0) {
-    return null; // No valid search terms
-  }
-  
-  // Use regex search on name field as fallback
-  const orConditions = searchTerms.map(term => ({
-    name: new RegExp(term, 'i')
-  }));
-  
-  query.$or = orConditions;
-  return query;
+  return { minPrice, maxPrice };
 };
 
 
 
 const getProductContext = async (userQuery) => {
   try {
-    const dbQuery = buildDatabaseQuery(userQuery);
     const metadata = await getCachedMetadata();
+    const { minPrice, maxPrice } = parsePriceFilters(userQuery);
     
-    // Query products with appropriate sorting
-    let query = Product.find(dbQuery);
+    // 1) Semantic search via Qdrant (single source of truth for product matching)
+    const queryEmbedding = await generateEmbedding(userQuery);
     
-    // Only sort by textScore if we have a text search
-    if (dbQuery.$text) {
-      query = query.sort({ score: { $meta: "textScore" } });
-    } else {
-      // For price-only queries, sort by price ascending, then rating
-      query = query.sort({ price: 1, rating: -1 });
+    // Get more candidates than we need so we can filter by price and still have results
+    let candidates = await searchSimilarProducts(queryEmbedding, {
+      limit: 30
+    });
+    
+    // Apply price filters on Qdrant payload (if present)
+    if (minPrice != null || maxPrice != null) {
+      candidates = candidates.filter(p => {
+        const price = typeof p.price === 'number' ? p.price : null;
+        if (price == null) return false;
+        if (minPrice != null && price < minPrice) return false;
+        if (maxPrice != null && price > maxPrice) return false;
+        return true;
+      });
     }
     
-    let products = await query
-      .limit(10)
-      .select('name price category brand rating stock description');
-    
-    // Fallback to regex search if no results found
-    if (products.length === 0) {
-      const fallbackQuery = buildFallbackQuery(userQuery);
-      if (fallbackQuery) {
-        products = await Product.find(fallbackQuery)
-          .limit(10)
-          .sort({ rating: -1, price: 1 })
-          .select('name price category brand rating stock description');
-      }
-    }
-    
-    // Format products for AI context
-    const formattedProducts = products.map(p => ({
+    // Map to the format expected by the AI prompt
+    const products = candidates.slice(0, 10).map(p => ({
       name: p.name,
       price: p.price,
       category: p.category,
@@ -166,7 +128,7 @@ const getProductContext = async (userQuery) => {
     }));
     
     return {
-      products: formattedProducts,
+      products,
       metadata
     };
     
