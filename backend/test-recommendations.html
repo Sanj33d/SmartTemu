@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommendation System Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .test-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        input, button {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input {
+            flex: 1;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .product-card {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .product-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .product-info p {
+            color: #666;
+            font-size: 14px;
+            margin: 3px 0;
+        }
+        .product-meta {
+            text-align: right;
+        }
+        .score {
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            font-weight: bold;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .user-tracking {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .user-tracking h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        .tracked-products {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .tracked-product {
+            background: #ffc107;
+            color: #856404;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .tracked-product:hover {
+            background: #ffb300;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Product Recommendation System Test</h1>
+
+        <!-- User Tracking Section -->
+        <div class="test-section">
+            <h2>👤 User Tracking (Simulated)</h2>
+            <div class="user-tracking">
+                <h3>Tracked Products (Click to remove)</h3>
+                <p>These represent products the user has viewed/liked. Use these IDs for personalized recommendations.</p>
+                <div class="tracked-products" id="trackedProducts">
+                    <span>No products tracked yet. Search and click products below to track them.</span>
+                </div>
+                <button onclick="clearTracking()" style="margin-top: 10px; background: #dc3545;">Clear All</button>
+            </div>
+        </div>
+
+        <!-- Query-Based Recommendations -->
+        <div class="test-section">
+            <h2>🔍 Query-Based Recommendations</h2>
+            <p style="margin-bottom: 15px; color: #666;">Enter a search query to find semantically similar products</p>
+            <div class="input-group">
+                <input type="text" id="queryInput" placeholder="e.g., gaming laptop, wireless audio, fitness equipment" value="gaming laptop">
+                <input type="number" id="queryLimit" placeholder="Limit" value="10" style="width: 100px;">
+                <button onclick="testQueryRecommendations()">Search</button>
+            </div>
+            <div id="queryResults" class="results"></div>
+        </div>
+
+        <!-- Product-Based Recommendations -->
+        <div class="test-section">
+            <h2>🔗 Product-Based Recommendations</h2>
+            <p style="margin-bottom: 15px; color: #666;">Get products similar to a specific product</p>
+            <div class="input-group">
+                <input type="text" id="productIdInput" placeholder="Enter Product ID (MongoDB _id)">
+                <input type="number" id="productLimit" placeholder="Limit" value="10" style="width: 100px;">
+                <button onclick="testProductRecommendations()">Get Similar</button>
+            </div>
+            <div id="productResults" class="results"></div>
+        </div>
+
+        <!-- User-Based Recommendations (Custom Feed) -->
+        <div class="test-section">
+            <h2>⭐ Personalized Feed (User-Based)</h2>
+            <p style="margin-bottom: 15px; color: #666;">Get personalized recommendations based on tracked products</p>
+            <div class="input-group">
+                <input type="number" id="userLimit" placeholder="Limit" value="10" style="width: 100px;">
+                <button onclick="testUserRecommendations()">Get My Feed</button>
+            </div>
+            <div id="userResults" class="results"></div>
+        </div>
+
+        <!-- Popular Products -->
+        <div class="test-section">
+            <h2>🔥 Popular Products</h2>
+            <div class="input-group">
+                <input type="number" id="popularLimit" placeholder="Limit" value="10" style="width: 100px;">
+                <button onclick="testPopularProducts()">Get Popular</button>
+            </div>
+            <div id="popularResults" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let trackedProductIds = [];
+
+        // Load tracked products from localStorage
+        function loadTracking() {
+            const saved = localStorage.getItem('trackedProducts');
+            if (saved) {
+                trackedProductIds = JSON.parse(saved);
+                updateTrackingDisplay();
+            }
+        }
+
+        // Save tracked products to localStorage
+        function saveTracking() {
+            localStorage.setItem('trackedProducts', JSON.stringify(trackedProductIds));
+        }
+
+        // Update tracking display
+        function updateTrackingDisplay() {
+            const container = document.getElementById('trackedProducts');
+            if (trackedProductIds.length === 0) {
+                container.innerHTML = '<span>No products tracked yet. Search and click products below to track them.</span>';
+            } else {
+                container.innerHTML = trackedProductIds.map(id => 
+                    `<span class="tracked-product" onclick="removeTracking('${id}')">${id.substring(0, 8)}... ✕</span>`
+                ).join('');
+            }
+        }
+
+        // Add product to tracking
+        function trackProduct(productId) {
+            if (!trackedProductIds.includes(productId)) {
+                trackedProductIds.push(productId);
+                saveTracking();
+                updateTrackingDisplay();
+            }
+        }
+
+        // Remove product from tracking
+        function removeTracking(productId) {
+            trackedProductIds = trackedProductIds.filter(id => id !== productId);
+            saveTracking();
+            updateTrackingDisplay();
+        }
+
+        // Clear all tracking
+        function clearTracking() {
+            trackedProductIds = [];
+            saveTracking();
+            updateTrackingDisplay();
+        }
+
+        // Display products
+        function displayProducts(containerId, products, showTrackButton = false) {
+            const container = document.getElementById(containerId);
+            
+            if (!products || products.length === 0) {
+                container.innerHTML = '<div class="error">No products found</div>';
+                return;
+            }
+
+            container.innerHTML = products.map(product => {
+                // Use mongoId from Qdrant payload (MongoDB ObjectId), fallback to id
+                const productId = product.mongoId || product.id || product._id;
+                const score = product.score ? `<span class="score">Score: ${product.score.toFixed(3)}</span>` : '';
+                
+                return `
+                    <div class="product-card">
+                        <div class="product-info">
+                            <h3>${product.name || 'Unknown Product'}</h3>
+                            <p><strong>Category:</strong> ${product.category || 'N/A'}</p>
+                            <p><strong>Brand:</strong> ${product.brand || 'N/A'}</p>
+                            <p><strong>Price:</strong> $${product.price?.toFixed(2) || '0.00'}</p>
+                            <p><strong>Rating:</strong> ${product.rating || 0}/5 (${product.reviewsCount || 0} reviews)</p>
+                            <p><strong>Stock:</strong> ${product.stock || 0}</p>
+                            <p style="font-size: 12px; color: #999; margin-top: 5px;">ID: ${productId}</p>
+                        </div>
+                        <div class="product-meta">
+                            ${score}
+                            ${showTrackButton ? `<button onclick="trackProduct('${productId}')" style="margin-top: 10px; padding: 5px 10px; font-size: 12px;">Track</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Test Query Recommendations
+        async function testQueryRecommendations() {
+            const query = document.getElementById('queryInput').value;
+            const limit = document.getElementById('queryLimit').value;
+            const container = document.getElementById('queryResults');
+            
+            container.innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/recommendations/query?q=${encodeURIComponent(query)}&limit=${limit}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayProducts('queryResults', data.data.recommendations, true);
+                } else {
+                    container.innerHTML = `<div class="error">Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test Product Recommendations
+        async function testProductRecommendations() {
+            const productId = document.getElementById('productIdInput').value;
+            const limit = document.getElementById('productLimit').value;
+            const container = document.getElementById('productResults');
+            
+            if (!productId) {
+                container.innerHTML = '<div class="error">Please enter a product ID</div>';
+                return;
+            }
+            
+            container.innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/recommendations/product/${productId}?limit=${limit}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayProducts('productResults', data.data.recommendations, true);
+                } else {
+                    container.innerHTML = `<div class="error">Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test User Recommendations (Custom Feed)
+        async function testUserRecommendations() {
+            const limit = document.getElementById('userLimit').value;
+            const container = document.getElementById('userResults');
+            
+            if (trackedProductIds.length === 0) {
+                container.innerHTML = '<div class="error">No products tracked yet. Track some products first!</div>';
+                return;
+            }
+            
+            container.innerHTML = '<div class="loading">Loading personalized feed...</div>';
+            
+            try {
+                const productIds = trackedProductIds.join(',');
+                const response = await fetch(`${API_BASE}/recommendations/user?productIds=${productIds}&limit=${limit}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayProducts('userResults', data.data.recommendations, true);
+                } else {
+                    container.innerHTML = `<div class="error">Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test Popular Products
+        async function testPopularProducts() {
+            const limit = document.getElementById('popularLimit').value;
+            const container = document.getElementById('popularResults');
+            
+            container.innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/recommendations/popular?limit=${limit}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayProducts('popularResults', data.data.recommendations, true);
+                } else {
+                    container.innerHTML = `<div class="error">Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Load tracking on page load
+        loadTracking();
+
+        // Allow Enter key to trigger search
+        document.getElementById('queryInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') testQueryRecommendations();
+        });
+    </script>
+</body>
+</html>
+

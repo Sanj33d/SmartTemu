@@ -60,7 +60,6 @@ backend/
 ```
 frontend/
 ├── public/
-│   ├── index.html
 │   └── images/
 ├── src/
 │   ├── components/      # Reusable Components
@@ -81,11 +80,13 @@ frontend/
 │   │   ├── images/
 │   │   ├── icons/
 │   │   └── fonts/
-│   ├── App.js
+│   ├── App.jsx
 │   ├── App.css
-│   ├── index.js
+│   ├── main.jsx
 │   └── index.css
 ├── .env.example         # Environment variables template
+├── index.html           # Vite entry HTML file
+├── vite.config.js       # Vite configuration
 ├── package.json
 └── README.md
 ```
